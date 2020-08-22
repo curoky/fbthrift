@@ -107,9 +107,31 @@ void PthreadThread::start() {
 
   state_ = starting;
 
-  if (pthread_create(&pthread_, &thread_attr, threadMain, (void*)selfRef) !=
-      0) {
-    throw SystemResourceException("pthread_create failed");
+  int code = pthread_create(&pthread_, &thread_attr, threadMain, (void*)selfRef);
+
+  if (code == EINVAL) {
+    /* For bug: Program with large TLS segments fail.
+     * More details: https://sourceware.org/bugzilla/show_bug.cgi?id=11787
+     * Bugfix reference: https://github.com/ruby/ruby/commit/410362f6a25f561a8cb9f6aeba34efd3125371a5
+     * Even if we are careful with our own stack use in pthread,
+     * any third-party libraries (eg libkqueue) which rely on __thread
+     * storage can cause small stack sizes to fail. So lets hope the
+     * default stack size is enough for them.
+     */
+    pthread_attr_t thread_attr_no_stacksize;
+    if (pthread_attr_init(&thread_attr_no_stacksize) != 0) {
+      throw SystemResourceException("pthread_attr_init failed");
+    }
+    if (pthread_attr_setdetachstate(
+            &thread_attr_no_stacksize,
+            detached_ ? PTHREAD_CREATE_DETACHED : PTHREAD_CREATE_JOINABLE) != 0) {
+      throw SystemResourceException("pthread_attr_setdetachstate failed");
+    }
+    code = pthread_create(&pthread_, &thread_attr_no_stacksize, threadMain, (void*)selfRef);
+  }
+
+  if (code != 0) {
+    throw SystemResourceException("pthread_create failed with code: " + std::to_string(code));
   }
 
   // Now that we have a thread, we can set the name we've been given, if any.
