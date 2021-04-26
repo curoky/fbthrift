@@ -155,6 +155,7 @@ class Cpp2Channel
           apache::thrift::transport::THeader*>,
       TAsyncTransportHandler,
       wangle::OutputBufferingHandler,
+      // QM: 这里负责解析包, buffer or frame or header
       FramingHandler,
       Cpp2Channel>
       Pipeline;

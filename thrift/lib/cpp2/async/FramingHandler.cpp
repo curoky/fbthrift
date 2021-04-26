@@ -46,6 +46,7 @@ void FramingHandler::read(Context* ctx, folly::IOBufQueue& q) {
     }
 
     if (!unframed) {
+      // QM: 这里如何影响下次读的包大小
       ctx->setReadBufferSettings(
           readBufferSize_, remaining ? remaining : readBufferSize_);
       return;
